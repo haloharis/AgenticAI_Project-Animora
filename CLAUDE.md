@@ -43,7 +43,7 @@ npm run dev                 # http://localhost:5173
 | Variable | Purpose |
 |----------|---------|
 | `GROQ_API_KEY` | LLM text generation (LLaMA 3.3 70B) |
-| `HF_API_TOKEN` | Image generation (FLUX.1-schnell) |
+| `POLLINATIONS_MODEL` | Image generation model (default: `flux`). Options: `flux`, `flux-realism`, `flux-anime`, `turbo` |
 | `DEEPGRAM_API_KEY` | Text-to-speech (Aura voices) |
 | `GROQ_MODEL` | Default: `llama-3.3-70b-versatile` |
 | `OUTPUT_DIR` | Where final MP4s are saved (default: `data/outputs`) |
@@ -60,8 +60,6 @@ npm run dev                 # http://localhost:5173
 **File-based snapshots + SQLite index.** Each pipeline version is a JSON file in `data/state_versions/{job_id}/vN.json`. SQLite holds the metadata index (path, phase, note, timestamp) for fast history queries.
 
 **BGM without external API.** Background music is generated from numpy sine waves using mood→frequency mapping (MOOD_BGM_FREQ in `shared/constants/constants.py`). Three harmonics at diminishing amplitudes create an ambient texture.
-
-**FLUX 503 retry.** Hugging Face Inference API returns 503 while the model cold-starts. `ImageGenTool` retries up to 3 times with `time.sleep(20 * attempt)`.
 
 **FFmpeg discovery.** `imageio_ffmpeg.get_ffmpeg_exe()` finds the bundled FFmpeg binary on any platform — no PATH dependency.
 
@@ -92,7 +90,7 @@ tests/              Unit and integration tests
 | `TTSTool` | audio | Deepgram `/v1/speak` → WAV file |
 | `BGMTool` | audio | Sine-wave ambient music generator |
 | `AudioMergerTool` | audio | Concatenate dialogue + attenuate/overlay BGM |
-| `ImageGenTool` | vision | FLUX.1-schnell via HF Inference API → PNG |
+| `ImageGenTool` | vision | FLUX via Pollinations.ai (free, no key) → PNG |
 | `ImageEditTool` | vision | Pillow transforms (resize/brighten/darken/crop) |
 | `StyleTransferTool` | vision | Re-prompts ImageGenTool with style modifier |
 | `CompositorTool` | video | MoviePy: Ken Burns ImageClip → MP4 |
@@ -147,6 +145,6 @@ pytest tests/unit/test_state_manager.py -v
 
 **Groq `json_object` mode error** — Every system prompt using `json_mode=True` must contain the word "JSON". Check `TextGeneratorTool` calls.
 
-**FLUX 503 loops** — Normal on first request (cold start). Wait ~60 s and retry.
+**Pollinations timeout** — The free service can be slow under heavy load; the tool already has a 120 s timeout. Retry the job if it times out.
 
 **SSE connection stays open** — The frontend `connectSSE()` in `services/sse.js` closes the `EventSource` on `{ type: "done" }`. If it loops, check the backend is emitting that event.

@@ -2,7 +2,7 @@
 Integration smoke test for the full pipeline.
 
 These tests require real API keys in .env and will make live network calls.
-Run only when environment variables GROQ_API_KEY, HF_API_TOKEN, DEEPGRAM_API_KEY
+Run only when environment variables GROQ_API_KEY, WAVESPEED_API_KEY, DEEPGRAM_API_KEY
 are set. They are skipped automatically otherwise.
 """
 import os
@@ -16,7 +16,7 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 def has_api_keys():
     missing = [
-        k for k in ["GROQ_API_KEY", "HF_API_TOKEN", "DEEPGRAM_API_KEY"]
+        k for k in ["GROQ_API_KEY", "WAVESPEED_API_KEY", "DEEPGRAM_API_KEY"]
         if not os.environ.get(k)
     ]
     if missing:

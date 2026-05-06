@@ -29,6 +29,6 @@ DEEPGRAM_VOICES = {
 
 PIPELINE_PHASES = ["story", "audio", "video"]
 
-HF_IMAGE_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+WAVESPEED_API_BASE = "https://api.wavespeed.ai/api/v3"
 DEEPGRAM_TTS_URL = "https://api.deepgram.com/v1/speak"
 GROQ_MODEL_DEFAULT = "llama-3.3-70b-versatile"

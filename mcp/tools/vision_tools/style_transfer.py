@@ -8,7 +8,7 @@ from mcp.tools.vision_tools.image_gen_tool import ImageGenTool
 
 class StyleTransferTool(BaseTool):
     name = "style_transfer"
-    description = "Re-generate image with a different visual style using FLUX"
+    description = "Re-generate image with a different visual style using FLUX via Pollinations.ai"
 
     def __init__(self) -> None:
         self._image_gen = ImageGenTool()

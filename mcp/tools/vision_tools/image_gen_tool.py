@@ -1,50 +1,46 @@
 from __future__ import annotations
 
+import io
 import os
-import time
+import urllib.parse
 from typing import Any, Dict
+
+import requests
+from PIL import Image
 
 from mcp.base_tool import BaseTool, ToolOutput
 from shared.constants.constants import VIDEO_HEIGHT, VIDEO_WIDTH
 from shared.utils.helpers import ensure_dirs
 
+POLLINATIONS_BASE = "https://image.pollinations.ai/prompt"
+
 
 class ImageGenTool(BaseTool):
     name = "image_gen"
-    description = "Generate images using FLUX.1-schnell via Hugging Face Inference API"
+    description = "Generate images using FLUX via Pollinations.ai (free, no API key)"
 
     def execute(self, inputs: Dict[str, Any]) -> ToolOutput:
         prompt: str = inputs["prompt"]
         output_path: str = inputs["output_path"]
         width: int = inputs.get("width", VIDEO_WIDTH)
         height: int = inputs.get("height", VIDEO_HEIGHT)
+        model: str = inputs.get("model", os.getenv("POLLINATIONS_MODEL", "flux"))
 
         ensure_dirs(os.path.dirname(output_path) or ".")
 
-        from huggingface_hub import InferenceClient
+        encoded_prompt = urllib.parse.quote(prompt)
+        url = (
+            f"{POLLINATIONS_BASE}/{encoded_prompt}"
+            f"?width={width}&height={height}&model={model}&nologo=true"
+        )
 
-        model = os.getenv("HF_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
-        token = os.getenv("HF_API_TOKEN")
+        resp = requests.get(url, timeout=120)
 
-        client = InferenceClient(token=token)
+        if not resp.ok:
+            return ToolOutput(
+                success=False,
+                error=f"Pollinations error {resp.status_code}: {resp.text[:300]}",
+            )
 
-        for attempt in range(3):
-            try:
-                image = client.text_to_image(
-                    prompt,
-                    model=model,
-                    width=width,
-                    height=height,
-                    num_inference_steps=4,
-                    guidance_scale=0.0,
-                )
-                image.save(output_path)
-                return ToolOutput(success=True, data={"path": output_path})
-            except Exception as e:
-                err = str(e)
-                if "503" in err or "loading" in err.lower():
-                    time.sleep(20 * (attempt + 1))
-                    continue
-                raise
-
-        return ToolOutput(success=False, error="HF Inference API returned 503 after 3 retries (model loading)")
+        Image.open(io.BytesIO(resp.content)).save(output_path)
+        return ToolOutput(success=True, data={"path": output_path})
