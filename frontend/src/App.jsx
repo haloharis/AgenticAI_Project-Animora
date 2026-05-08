@@ -3,6 +3,7 @@ import PromptInput from './components/PromptInput'
 import PhaseProgress from './components/PhaseProgress'
 import VideoPreview from './components/VideoPreview'
 import EditAgent from './components/EditAgent'
+import LiveLogs from './components/LiveLogs'
 import { startPipeline, submitEdit, getHistory, revertVersion, rerunPhase, getVideoUrl } from './services/api'
 import { connectSSE } from './services/sse'
 
@@ -39,10 +40,19 @@ export default function App() {
   const [versions,       setVersions]       = useState([])
   const [currentVersion, setCurrentVersion] = useState(1)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [logs,           setLogs]           = useState([])
   const sseRef = useRef(null)
 
   const applySSEEvent = useCallback((evt, job_id) => {
-    if (evt.phase) {
+    if (evt.type === 'log' && evt.message) {
+      setLogs(prev => {
+        const entry = { phase: evt.phase || '', level: evt.level || 'info', message: evt.message, ts: Date.now() }
+        const next = [...prev, entry]
+        return next.length > 200 ? next.slice(-200) : next
+      })
+      return
+    }
+    if (evt.phase && evt.status) {
       setPhases(p => ({
         ...p,
         [evt.phase]: { status: evt.status, progress: evt.progress || 0, error: evt.error || null },
@@ -76,6 +86,7 @@ export default function App() {
     setVersions([])
     setCurrentVersion(1)
     setLoadingHistory(false)
+    setLogs([])
     if (sseRef.current) { sseRef.current.close(); sseRef.current = null }
 
     try {
@@ -170,17 +181,6 @@ export default function App() {
     }
   }, [jobId])
 
-  const activeMini = phases.story.status === 'running' ? 'story'
-    : phases.audio.status === 'running' ? 'audio'
-    : phases.video.status === 'running' ? 'video'
-    : null
-
-  const overlayMessages = {
-    story: 'Drafting story structure…',
-    audio: 'Casting voices and composing audio…',
-    video: 'Rendering scenes and encoding video…',
-  }
-
   return (
     <>
       <div className="bg-atmosphere">
@@ -223,7 +223,8 @@ export default function App() {
               onSubmit={handleSubmit}
               isGenerating={isGenerating}
             />
-            <PhaseProgress phases={phases} onRerun={handleRerun} />
+            <PhaseProgress phases={phases} onRerun={handleRerun} logs={logs} />
+            <LiveLogs logs={logs} isGenerating={isGenerating} />
           </div>
 
           <div className="col">
@@ -247,35 +248,6 @@ export default function App() {
         </footer>
       </main>
 
-      {isGenerating && !videoUrl && (
-        <div className="gen-overlay">
-          <div className="gen-overlay-inner">
-            <div className="gen-logo">
-              <span className="gen-logo-glyph">A</span>
-            </div>
-            <h2>Generating your story…</h2>
-            <p className="sub" key={activeMini}>
-              {activeMini ? overlayMessages[activeMini] : 'Spinning up the pipeline…'}
-            </p>
-            <div className="mini-phases">
-              {['story', 'audio', 'video'].map(p => {
-                const ph  = phases[p]
-                const cls = ph.status === 'completed'
-                  ? 'mini-phase done'
-                  : ph.status === 'running'
-                    ? 'mini-phase active'
-                    : 'mini-phase'
-                return (
-                  <div key={p} className={cls}>
-                    <span className="pip" />
-                    <span style={{ textTransform: 'capitalize' }}>{p}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }

@@ -6,6 +6,8 @@ MOOD_BGM_FREQ: dict = {
     "mysterious": 285,
     "epic": 639,
     "romantic": 417,
+    "horror": 174,
+    "cartoon": 594,
 }
 
 KEN_BURNS_PRESETS = [
@@ -29,6 +31,9 @@ DEEPGRAM_VOICES = {
 
 PIPELINE_PHASES = ["story", "audio", "video"]
 
-HF_IMAGE_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+CF_IMAGE_BASE_URL = (
+    "https://api.cloudflare.com/client/v4/accounts/{account_id}"
+    "/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
+)
 DEEPGRAM_TTS_URL = "https://api.deepgram.com/v1/speak"
 GROQ_MODEL_DEFAULT = "llama-3.3-70b-versatile"

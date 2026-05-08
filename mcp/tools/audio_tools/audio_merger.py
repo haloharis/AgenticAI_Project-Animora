@@ -18,6 +18,7 @@ class AudioMergerTool(BaseTool):
         bgm_file: str = inputs["bgm_file"]
         output_path: str = inputs["output_path"]
         bgm_volume_db: float = inputs.get("bgm_volume_db", -12.0)
+        target_duration_ms: int = inputs.get("target_duration_ms", 0)
 
         ensure_dirs(os.path.dirname(output_path) or ".")
 
@@ -28,12 +29,19 @@ class AudioMergerTool(BaseTool):
         else:
             combined = AudioSegment.silent(duration=5000)
 
+        # Target length: whichever is larger — the actual dialogue or the scene duration
+        target_ms = max(target_duration_ms, len(combined))
+
+        # Pad silence after dialogue so audio fills the full scene duration
+        if len(combined) < target_ms:
+            combined = combined + AudioSegment.silent(duration=target_ms - len(combined))
+
         bgm = AudioSegment.from_wav(bgm_file) + bgm_volume_db
-        # Loop BGM to match or exceed dialogue length
-        if len(bgm) < len(combined):
-            loops = (len(combined) // len(bgm)) + 1
+        # Loop BGM to cover full target duration, then trim
+        if len(bgm) < target_ms:
+            loops = (target_ms // len(bgm)) + 1
             bgm = bgm * loops
-        bgm = bgm[: len(combined)]
+        bgm = bgm[:target_ms]
 
         merged = combined.overlay(bgm)
         merged.export(output_path, format="wav")

@@ -16,6 +16,8 @@ class Mood(str, Enum):
     mysterious = "mysterious"
     epic = "epic"
     romantic = "romantic"
+    horror = "horror"
+    cartoon = "cartoon"
 
 
 class PhaseStatus(str, Enum):
@@ -41,6 +43,7 @@ class TransitionType(str, Enum):
 class Character(BaseModel):
     id: str = Field(default_factory=lambda: f"char_{uuid.uuid4().hex[:8]}")
     name: str
+    role: str = "supporting"
     description: str
     voice_id: str = "aura-asteria-en"
     personality: str = ""

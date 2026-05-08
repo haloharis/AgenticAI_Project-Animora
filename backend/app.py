@@ -26,7 +26,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 setup_logging()
 logger = logging.getLogger(__name__)
 
-_REQUIRED_ENV = ["GROQ_API_KEY", "HF_API_TOKEN", "DEEPGRAM_API_KEY"]
+_REQUIRED_ENV = ["GROQ_API_KEY", "CF_API_TOKEN", "CF_ACCOUNT_ID", "DEEPGRAM_API_KEY"]
 _missing = [k for k in _REQUIRED_ENV if not os.getenv(k)]
 if _missing:
     logger.warning("Missing required env vars (check .env): %s", ", ".join(_missing))

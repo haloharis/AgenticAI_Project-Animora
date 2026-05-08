@@ -9,7 +9,12 @@ def build_story_generation_prompt(user_prompt: str, style: str) -> Tuple[str, st
         "You are a creative screenwriter and storyteller. "
         "Your job is to create a compelling short animated video script. "
         "Return a JSON object with the exact structure specified. "
-        "Ensure all character_id references in dialogue match character ids exactly."
+        "Ensure all character_id references in dialogue match character ids exactly. "
+        "Character descriptions are used directly as image generation prompts — write them "
+        "as precise, repeatable visual descriptions: hair color, eye color, clothing, "
+        "distinguishing features. Be specific and concrete, not abstract or narrative. "
+        "Use the same description wording consistently — it will be reused in every scene "
+        "the character appears in to keep their appearance consistent across images."
     )
     user_msg = f"""Create a short animated video script based on this idea: "{user_prompt}"
 
@@ -24,7 +29,8 @@ Return a JSON object with this exact structure:
     {{
       "id": "char_001",
       "name": "Character Name",
-      "description": "Physical and personality description",
+      "role": "protagonist",
+      "description": "Visual appearance only: e.g. tall young woman, long red hair, green eyes, wearing a brown leather jacket and dark jeans, small scar above left eyebrow",
       "voice_id": "aura-asteria-en",
       "personality": "personality traits"
     }}
@@ -34,7 +40,7 @@ Return a JSON object with this exact structure:
       "id": "scene_001",
       "scene_number": 1,
       "title": "Scene title",
-      "description": "Vivid scene description for visual generation",
+      "description": "Describe what is visually in the frame: setting, lighting, character positions, actions, props. Write as a camera shot description, not a narrative summary.",
       "visual_prompt": "",
       "mood": "calm",
       "duration_ms": 8000,
@@ -58,7 +64,10 @@ Requirements:
 - transition must be one of: fade, cut, dissolve
 - voice_id must be one of: aura-asteria-en, aura-orion-en, aura-luna-en, aura-arcas-en
 - duration_ms should be between 5000-15000 per scene
-- Make the story engaging with a clear beginning, middle, and end"""
+- Make the story engaging with a clear beginning, middle, and end
+- Character description must be a visual image-generation prompt (appearance only, no personality)
+- Scene description must describe the visual frame content, not the narrative event
+- role must be one of: protagonist, antagonist, mentor, supporting"""
 
     return system_prompt, user_msg
 
@@ -81,19 +90,37 @@ def validate_story_arc(story_dict: Dict[str, Any]) -> Tuple[bool, str]:
     return True, "OK"
 
 
+_COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+
+
 def build_visual_prompt(scene: Dict[str, Any], characters: List[Dict[str, Any]]) -> str:
     desc = scene.get("description", "")
     mood = scene.get("mood", "calm")
-    style = scene.get("style", "cinematic")
 
-    char_names = [c["name"] for c in characters]
-    chars_str = ", ".join(char_names) if char_names else ""
+    # Only include characters who speak in this scene to avoid visual noise
+    scene_char_ids = {d["character_id"] for d in scene.get("dialogue", [])}
+    scene_chars = [c for c in characters if c["id"] in scene_char_ids]
+
+    char_parts = [
+        f"{c['name']} ({c['description']})" for c in scene_chars if c.get("description")
+    ]
+    char_str = "; ".join(char_parts)
+
+    # Derive exact character count from the story data — never rely on the user's phrasing
+    n = len(scene_chars)
+    if n > 0:
+        count_word = _COUNT_WORDS.get(n, str(n))
+        noun = "character" if n == 1 else "characters"
+        count_prefix = f"Scene with exactly {count_word} {noun}: "
+    else:
+        count_prefix = ""
 
     prompt = (
-        f"{desc}"
-        + (f", featuring {chars_str}" if chars_str else "")
-        + f", {mood} atmosphere, cinematic lighting, high quality digital art, "
-        + "detailed background, vivid colors, professional illustration"
+        count_prefix
+        + desc
+        + (f", characters: {char_str}" if char_str else "")
+        + f", {mood} atmosphere, cinematic lighting, high quality digital art,"
+          " detailed background, vivid colors, professional illustration"
     )
     return prompt[:500]
 
@@ -105,7 +132,10 @@ def estimate_duration(scenes: List[Dict[str, Any]]) -> int:
             len(line.get("text", "").split())
             for line in scene.get("dialogue", [])
         )
-        total += max(dialogue_words * 70 + 2000, scene.get("duration_ms", 5000))
+        # LLM-supplied duration_ms is used as a floor so scenes feel at least as long as intended
+        adjusted = max(dialogue_words * 70 + 2000, scene.get("duration_ms", 5000))
+        scene["duration_ms"] = adjusted
+        total += adjusted
     return total
 
 

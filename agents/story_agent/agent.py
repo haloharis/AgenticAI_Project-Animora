@@ -37,6 +37,12 @@ class StoryAgent:
     def __init__(self) -> None:
         self.executor = ToolExecutor(ToolRegistry)
         self.graph = self._build_graph()
+        self._log_fn = None
+
+    def _log(self, message: str, level: str = "info") -> None:
+        getattr(logger, level if level in ("info", "warning", "error") else "info")(message)
+        if self._log_fn:
+            self._log_fn(message, level)
 
     def _build_graph(self) -> Any:
         g = StateGraph(StoryState)
@@ -69,7 +75,7 @@ class StoryAgent:
         return g.compile()
 
     def _generate_story_node(self, state: StoryState) -> Dict[str, Any]:
-        logger.info("Generating story...")
+        self._log("Generating story from LLM…")
         system_prompt, user_msg = build_story_generation_prompt(
             state["user_prompt"], state["style"]
         )
@@ -86,7 +92,7 @@ class StoryAgent:
         raw_text = result.data if result.success else "{}"
         return {
             "raw_story_text": raw_text,
-            "retry_count": state.get("retry_count", 0),
+            "retry_count": state.get("retry_count", 0) + 1,
         }
 
     def _structure_json_node(self, state: StoryState) -> Dict[str, Any]:
@@ -111,39 +117,48 @@ class StoryAgent:
             return "proceed"
         retry_count = state.get("retry_count", 0)
         if retry_count < 3:
-            logger.warning(f"Story validation failed, retrying ({retry_count+1}/3): {state['errors']}")
+            self._log(f"Story validation failed, retrying ({retry_count+1}/3): {state['errors']}", "warning")
             return "retry"
-        logger.error("Story validation failed after 3 retries")
+        self._log("Story validation failed after 3 retries", "error")
         return "fail"
 
     def _build_prompts_node(self, state: StoryState) -> Dict[str, Any]:
         story_dict = state["story_dict"]
         characters = story_dict.get("characters", [])
+        sep = "─" * 60
         for scene in story_dict.get("scenes", []):
             if not scene.get("visual_prompt"):
                 scene["visual_prompt"] = build_visual_prompt(scene, characters)
+            print(f"\n{sep}")
+            print(f"[SCENE {scene.get('scene_number', '?')}: \"{scene.get('title', '')}\"]  VISUAL PROMPT:")
+            print(scene["visual_prompt"])
+            dialogues = scene.get("dialogue", [])
+            if dialogues:
+                print(f"\n  Dialogue lines ({len(dialogues)}):")
+                for i, line in enumerate(dialogues, 1):
+                    char_id = line.get("character_id", "?")
+                    text = line.get("text", "")
+                    print(f"  [{i}] ({char_id}): {text}")
+            print(sep)
         return {"story_dict": story_dict}
 
     def _estimate_duration_node(self, state: StoryState) -> Dict[str, Any]:
         story_dict = state["story_dict"]
-        scenes = story_dict.get("scenes", [])
-        total_ms = estimate_duration(scenes)
-        story_dict["total_duration_ms"] = total_ms
-        for i, scene in enumerate(scenes):
-            words = sum(len(l.get("text", "").split()) for l in scene.get("dialogue", []))
-            scene["duration_ms"] = max(words * 70 + 2000, scene.get("duration_ms", 5000))
+        story_dict["total_duration_ms"] = estimate_duration(story_dict.get("scenes", []))
         return {"story_dict": story_dict}
 
     def _check_consistency_node(self, state: StoryState) -> Dict[str, Any]:
         passed, issues = check_consistency(state["story_dict"])
         if not passed:
-            logger.warning(f"Consistency issues (non-fatal): {issues}")
+            self._log(f"Consistency issues (non-fatal): {issues}", "warning")
         return {"validation_passed": passed, "errors": issues}
 
     def _finalize_node(self, state: StoryState) -> Dict[str, Any]:
+        self._log("Story structure finalized.")
         return {"story": state["story_dict"]}
 
-    def run(self, user_prompt: str, style: str = "cinematic") -> Story:
+    def run(self, user_prompt: str, style: str = "cinematic", log_fn=None) -> Story:
+        self._log_fn = log_fn
         initial: StoryState = {
             "user_prompt": user_prompt,
             "style": style,

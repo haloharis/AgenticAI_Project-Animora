@@ -21,6 +21,7 @@ class VideoAgent:
         manifest: TimingManifest,
         job_id: str,
         add_subtitles: bool = False,
+        log_fn=None,
     ) -> str:
         temp_dir = get_temp_dir()
         output_dir = get_output_dir()
@@ -30,9 +31,17 @@ class VideoAgent:
         ensure_dirs(images_dir, job_output_dir)
 
         # Step 1: Generate images for each scene
+        sep = "─" * 60
         for scene in story.scenes:
             img_path = os.path.join(images_dir, f"{scene.id}.png")
-            logger.info(f"Generating image for scene: {scene.title}")
+            msg = f"Generating image for scene: {scene.title}"
+            logger.info(msg)
+            if log_fn:
+                log_fn(msg)
+            print(f"\n{sep}")
+            print(f"[VIDEO] Scene {scene.scene_number}: \"{scene.title}\"  →  IMAGE PROMPT:")
+            print(scene.visual_prompt)
+            print(sep)
             result = self.executor.run(
                 "image_gen",
                 {"prompt": scene.visual_prompt, "output_path": img_path},
@@ -40,7 +49,10 @@ class VideoAgent:
             if result.success:
                 scene.image_path = img_path
             else:
-                logger.error(f"Image generation failed for scene {scene.id}: {result.error}")
+                err = f"Image generation failed for scene {scene.id}: {result.error}"
+                logger.error(err)
+                if log_fn:
+                    log_fn(err, "error")
                 # Create a placeholder colored image
                 self._create_placeholder_image(img_path, scene.mood.value)
                 scene.image_path = img_path
@@ -65,6 +77,8 @@ class VideoAgent:
         # Step 3: Composite
         output_path = os.path.join(job_output_dir, "final_output.mp4")
         logger.info("Compositing final video...")
+        if log_fn:
+            log_fn("Compositing final video…")
         comp_result = self.executor.run(
             "compositor",
             {"scenes": scene_payloads, "output_path": output_path},
