@@ -16,6 +16,30 @@ class EditExecutor:
         self.tool_executor = ToolExecutor(ToolRegistry)
         self.state_manager = state_manager or StateManager.get_instance()
 
+    def _run_story_rerun(self, inputs: Dict[str, Any], pipeline_state: PipelineState) -> None:
+        """Re-generate story, audio, and video after a script edit."""
+        from agents.story_agent.agent import StoryAgent
+        from agents.audio_agent.agent import AudioAgent
+        from agents.video_agent.agent import VideoAgent
+
+        edit_instruction = inputs.get("edit_instruction", "")
+        original_prompt = inputs.get("original_prompt", pipeline_state.user_prompt)
+        style = inputs.get("style", pipeline_state.style)
+        job_id = inputs.get("job_id", pipeline_state.job_id)
+
+        modified_prompt = f"{original_prompt}\n\nEdit instruction: {edit_instruction}" if edit_instruction else original_prompt
+        logger.info(f"Script re-run with prompt: {modified_prompt[:120]}…")
+
+        story = StoryAgent().run(modified_prompt, style)
+        pipeline_state.story = story
+        pipeline_state.user_prompt = modified_prompt
+
+        manifest = AudioAgent().run(story, job_id)
+        pipeline_state.timing_manifest = manifest
+
+        video_path = VideoAgent().run(story, manifest, job_id)
+        pipeline_state.final_video_path = video_path
+
     async def execute(
         self,
         plan: List[Dict[str, Any]],
@@ -28,6 +52,15 @@ class EditExecutor:
             for call in plan:
                 tool_name = call["tool"]
                 inputs = call.get("inputs", {})
+
+                if tool_name == "__story_rerun__":
+                    self._run_story_rerun(inputs, pipeline_state)
+                    continue
+
+                if tool_name == "__update_final_video__":
+                    pipeline_state.final_video_path = inputs["new_path"]
+                    continue
+
                 result = self.tool_executor.run(tool_name, inputs)
                 if not result.success and tool_name != "logger_tool":
                     logger.warning(f"Tool '{tool_name}' failed: {result.error}")

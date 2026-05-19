@@ -47,6 +47,7 @@ class Character(BaseModel):
     description: str
     voice_id: str = "aura-asteria-en"
     personality: str = ""
+    reference_image_path: str = ""
 
 
 class DialogueLine(BaseModel):
@@ -134,6 +135,7 @@ class EditAction(BaseModel):
     scope: str = "single"
     parameters: Dict[str, Any] = Field(default_factory=dict)
     confidence: float = 1.0
+    query: str = ""  # original user query — fallback when LLM parameters are incomplete
 
 
 class EditResult(BaseModel):

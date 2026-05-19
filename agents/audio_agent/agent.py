@@ -30,7 +30,7 @@ class AudioAgent:
     def __init__(self) -> None:
         self.executor = ToolExecutor(ToolRegistry)
 
-    def run(self, story: Story, job_id: str, log_fn=None) -> TimingManifest:
+    def run(self, story: Story, job_id: str, log_fn=None, progress_fn=None) -> TimingManifest:
         temp_dir = get_temp_dir()
         audio_dir = os.path.join(temp_dir, job_id, "audio")
         os.makedirs(audio_dir, exist_ok=True)
@@ -38,9 +38,10 @@ class AudioAgent:
         segments: list[AudioSegment] = []
         scene_timings: dict[str, dict] = {}
         current_ms = 0
+        total_scenes = max(len(story.scenes), 1)
 
         sep = "─" * 60
-        for scene in story.scenes:
+        for scene_idx, scene in enumerate(story.scenes):
             scene_start = current_ms
             dialogue_files: list[str] = []
             msg = f"Generating audio for scene: {scene.title}"
@@ -123,6 +124,8 @@ class AudioAgent:
             scene_end = scene_start + scene_duration
             scene_timings[scene.id] = {"start_ms": scene_start, "end_ms": scene_end}
             current_ms = scene_end
+            if progress_fn:
+                progress_fn(int((scene_idx + 1) / total_scenes * 95))
 
         story.total_duration_ms = current_ms
 

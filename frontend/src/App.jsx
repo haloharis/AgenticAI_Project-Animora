@@ -26,6 +26,8 @@ function mapHistory(items) {
     phase:      h.phase || 'story',
     note:       h.note || h.message || '',
     created_at: h.created_at ? new Date(h.created_at).getTime() : Date.now(),
+    has_video:  h.has_video || false,
+    video_url:  h.video_url || null,
   }))
 }
 
@@ -181,6 +183,10 @@ export default function App() {
     }
   }, [jobId])
 
+  const handlePlayVersion = useCallback((videoUrl) => {
+    setVideoUrl(videoUrl + '&t=' + Date.now())
+  }, [])
+
   return (
     <>
       <div className="bg-atmosphere">
@@ -237,6 +243,7 @@ export default function App() {
                 currentVersion={currentVersion}
                 onApplyEdit={handleApplyEdit}
                 onRevert={handleRevert}
+                onPlayVersion={handlePlayVersion}
                 loadingHistory={loadingHistory}
               />
             )}

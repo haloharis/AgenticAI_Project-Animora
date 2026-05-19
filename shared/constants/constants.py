@@ -10,11 +10,19 @@ MOOD_BGM_FREQ: dict = {
     "cartoon": 594,
 }
 
+KEN_BURNS_SAFETY = 1.1  # pre-scale overscan: provides pan headroom without quality loss
+
 KEN_BURNS_PRESETS = [
-    {"zoom_start": 1.0, "zoom_end": 1.15, "pan_x": 0, "pan_y": 0},
-    {"zoom_start": 1.1, "zoom_end": 1.0, "pan_x": 20, "pan_y": 0},
-    {"zoom_start": 1.0, "zoom_end": 1.1, "pan_x": 0, "pan_y": 15},
-    {"zoom_start": 1.05, "zoom_end": 1.0, "pan_x": -10, "pan_y": 0},
+    # All presets zoom IN (start ≤ end) so the eased pan becomes visible as zoom increases.
+    # Pan values are source-image pixels at full zoom; clamped automatically when zoomed out.
+    {"zoom_start": 1.0,  "zoom_end": 1.15, "pan_x":   0, "pan_y":   0},  # classic slow zoom
+    {"zoom_start": 1.0,  "zoom_end": 1.15, "pan_x":  70, "pan_y":   0},  # zoom + drift right
+    {"zoom_start": 1.0,  "zoom_end": 1.12, "pan_x":   0, "pan_y":  60},  # zoom + drift down
+    {"zoom_start": 1.0,  "zoom_end": 1.12, "pan_x": -70, "pan_y":   0},  # zoom + drift left
+    {"zoom_start": 1.0,  "zoom_end": 1.10, "pan_x":  55, "pan_y":  40},  # diagonal ↘
+    {"zoom_start": 1.0,  "zoom_end": 1.12, "pan_x":   0, "pan_y": -60},  # zoom + drift up
+    {"zoom_start": 1.0,  "zoom_end": 1.10, "pan_x": -55, "pan_y":  40},  # diagonal ↙
+    {"zoom_start": 1.05, "zoom_end": 1.15, "pan_x":  80, "pan_y": -35},  # wide pan, tight zoom
 ]
 
 VIDEO_WIDTH = 1280
@@ -31,9 +39,7 @@ DEEPGRAM_VOICES = {
 
 PIPELINE_PHASES = ["story", "audio", "video"]
 
-CF_IMAGE_BASE_URL = (
-    "https://api.cloudflare.com/client/v4/accounts/{account_id}"
-    "/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
-)
+ARK_API_URL_DEFAULT = "https://ark.ap-southeast.bytepluses.com/api/v3/images/generations"
+ARK_MODEL_DEFAULT = "seedream-4-0-250828"
 DEEPGRAM_TTS_URL = "https://api.deepgram.com/v1/speak"
 GROQ_MODEL_DEFAULT = "llama-3.3-70b-versatile"

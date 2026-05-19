@@ -15,7 +15,7 @@ Phase 2: Audio Agent
     │  Deepgram TTS per dialogue line + sine-wave BGM + merge
     ▼
 Phase 3: Video Agent
-    │  FLUX.1-schnell images + MoviePy Ken Burns animation + compose
+    │  Seedream (ARK API) images + MoviePy Ken Burns animation + compose
     ▼
 Phase 4: FastAPI Backend + React Frontend
     │  SSE real-time progress + edit interface + version history
@@ -43,9 +43,11 @@ npm run dev                 # http://localhost:5173
 | Variable | Purpose |
 |----------|---------|
 | `GROQ_API_KEY` | LLM text generation (LLaMA 3.3 70B) |
-| `HF_API_TOKEN` | Image generation (FLUX.1-schnell) |
-| `DEEPGRAM_API_KEY` | Text-to-speech (Aura voices) |
 | `GROQ_MODEL` | Default: `llama-3.3-70b-versatile` |
+| `ARK_API_KEY` | Image generation (Seedream via ByteDance ARK API) |
+| `ARK_API_URL` | Default: ARK southeast endpoint |
+| `ARK_MODEL` | Default: `seedream-4-0-250828` |
+| `DEEPGRAM_API_KEY` | Text-to-speech (Aura voices) |
 | `OUTPUT_DIR` | Where final MP4s are saved (default: `data/outputs`) |
 | `TEMP_DIR` | Intermediate files (default: `data/temp`) |
 | `STATE_DIR` | JSON version snapshots (default: `data/state_versions`) |
@@ -61,7 +63,7 @@ npm run dev                 # http://localhost:5173
 
 **BGM without external API.** Background music is generated from numpy sine waves using mood→frequency mapping (MOOD_BGM_FREQ in `shared/constants/constants.py`). Three harmonics at diminishing amplitudes create an ambient texture.
 
-**FLUX 503 retry.** Hugging Face Inference API returns 503 while the model cold-starts. `ImageGenTool` retries up to 3 times with `time.sleep(20 * attempt)`.
+**ARK/Seedream retry.** The ARK API can return 503 (overload) or 429 (rate limit). `ImageGenTool` retries up to 3 times with `time.sleep(20 * attempt)`. A 400 with `subject_reference` in the payload triggers a retry without it.
 
 **FFmpeg discovery.** `imageio_ffmpeg.get_ffmpeg_exe()` finds the bundled FFmpeg binary on any platform — no PATH dependency.
 
@@ -92,7 +94,7 @@ tests/              Unit and integration tests
 | `TTSTool` | audio | Deepgram `/v1/speak` → WAV file |
 | `BGMTool` | audio | Sine-wave ambient music generator |
 | `AudioMergerTool` | audio | Concatenate dialogue + attenuate/overlay BGM |
-| `ImageGenTool` | vision | FLUX.1-schnell via HF Inference API → PNG |
+| `ImageGenTool` | vision | Seedream via ARK API (ByteDance) → PNG; supports `subject_reference` for character IP |
 | `ImageEditTool` | vision | Pillow transforms (resize/brighten/darken/crop) |
 | `StyleTransferTool` | vision | Re-prompts ImageGenTool with style modifier |
 | `CompositorTool` | video | MoviePy: Ken Burns ImageClip → MP4 |
@@ -147,6 +149,6 @@ pytest tests/unit/test_state_manager.py -v
 
 **Groq `json_object` mode error** — Every system prompt using `json_mode=True` must contain the word "JSON". Check `TextGeneratorTool` calls.
 
-**FLUX 503 loops** — Normal on first request (cold start). Wait ~60 s and retry.
+**ARK 503/429 loops** — The Seedream API may return 503 (overload) or 429 (rate limit). `ImageGenTool` retries automatically; if it persists, wait ~60 s and resubmit.
 
 **SSE connection stays open** — The frontend `connectSSE()` in `services/sse.js` closes the `EventSource` on `{ type: "done" }`. If it loops, check the backend is emitting that event.

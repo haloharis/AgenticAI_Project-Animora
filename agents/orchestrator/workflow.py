@@ -31,6 +31,16 @@ class PipelineWorkflow:
                 )
         return log_fn
 
+    def _make_progress_fn(self, job_id: str, phase: str, loop: asyncio.AbstractEventLoop) -> Callable:
+        """Returns a sync callable that emits a progress SSE event for a running phase."""
+        def progress_fn(pct: int) -> None:
+            if self.sse_manager:
+                asyncio.run_coroutine_threadsafe(
+                    self.sse_manager.emit(job_id, {"phase": phase, "status": "running", "progress": int(pct)}),
+                    loop,
+                )
+        return progress_fn
+
     async def run_pipeline(
         self, job_id: str, user_prompt: str, style: str = "cinematic"
     ) -> PipelineState:
@@ -49,8 +59,9 @@ class PipelineWorkflow:
         try:
             from agents.story_agent.agent import StoryAgent
             log_fn = self._make_log_fn(job_id, "story", loop)
+            progress_fn = self._make_progress_fn(job_id, "story", loop)
             story = await loop.run_in_executor(
-                None, lambda: StoryAgent().run(user_prompt, style, log_fn=log_fn)
+                None, lambda: StoryAgent().run(user_prompt, style, log_fn=log_fn, progress_fn=progress_fn)
             )
             ps.story = story
             ps = update_phase_status(ps, "story", PhaseStatus.completed, progress_pct=100)
@@ -72,8 +83,9 @@ class PipelineWorkflow:
         try:
             from agents.audio_agent.agent import AudioAgent
             log_fn = self._make_log_fn(job_id, "audio", loop)
+            progress_fn = self._make_progress_fn(job_id, "audio", loop)
             manifest = await loop.run_in_executor(
-                None, lambda: AudioAgent().run(ps.story, job_id, log_fn=log_fn)
+                None, lambda: AudioAgent().run(ps.story, job_id, log_fn=log_fn, progress_fn=progress_fn)
             )
             ps.timing_manifest = manifest
             ps = update_phase_status(ps, "audio", PhaseStatus.completed, progress_pct=100)
@@ -95,8 +107,9 @@ class PipelineWorkflow:
         try:
             from agents.video_agent.agent import VideoAgent
             log_fn = self._make_log_fn(job_id, "video", loop)
+            progress_fn = self._make_progress_fn(job_id, "video", loop)
             video_path = await loop.run_in_executor(
-                None, lambda: VideoAgent().run(ps.story, ps.timing_manifest, job_id, log_fn=log_fn)
+                None, lambda: VideoAgent().run(ps.story, ps.timing_manifest, job_id, log_fn=log_fn, progress_fn=progress_fn)
             )
             ps.final_video_path = video_path
             ps = update_phase_status(ps, "video", PhaseStatus.completed, progress_pct=100)
@@ -122,6 +135,7 @@ class PipelineWorkflow:
 
         loop = asyncio.get_event_loop()
         log_fn = self._make_log_fn(job_id, phase, loop)
+        progress_fn = self._make_progress_fn(job_id, phase, loop)
 
         await self._emit(job_id, {"phase": phase, "status": "running", "progress": 0})
         await self._emit(job_id, {"type": "log", "phase": phase, "level": "info", "message": f"Re-running {phase} phase…"})
@@ -131,21 +145,21 @@ class PipelineWorkflow:
             if phase == "story":
                 from agents.story_agent.agent import StoryAgent
                 story = await loop.run_in_executor(
-                    None, lambda: StoryAgent().run(ps.user_prompt, ps.style, log_fn=log_fn)
+                    None, lambda: StoryAgent().run(ps.user_prompt, ps.style, log_fn=log_fn, progress_fn=progress_fn)
                 )
                 ps.story = story
                 ps = update_phase_status(ps, phase, PhaseStatus.completed, progress_pct=100)
             elif phase == "audio":
                 from agents.audio_agent.agent import AudioAgent
                 manifest = await loop.run_in_executor(
-                    None, lambda: AudioAgent().run(ps.story, job_id, log_fn=log_fn)
+                    None, lambda: AudioAgent().run(ps.story, job_id, log_fn=log_fn, progress_fn=progress_fn)
                 )
                 ps.timing_manifest = manifest
                 ps = update_phase_status(ps, phase, PhaseStatus.completed, progress_pct=100)
             elif phase == "video":
                 from agents.video_agent.agent import VideoAgent
                 video_path = await loop.run_in_executor(
-                    None, lambda: VideoAgent().run(ps.story, ps.timing_manifest, job_id, log_fn=log_fn)
+                    None, lambda: VideoAgent().run(ps.story, ps.timing_manifest, job_id, log_fn=log_fn, progress_fn=progress_fn)
                 )
                 ps.final_video_path = video_path
                 ps = update_phase_status(ps, phase, PhaseStatus.completed, progress_pct=100)

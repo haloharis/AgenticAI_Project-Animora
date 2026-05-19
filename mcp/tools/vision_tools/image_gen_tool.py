@@ -1,69 +1,76 @@
 from __future__ import annotations
 
+import base64
 import os
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import requests
 
 from mcp.base_tool import BaseTool, ToolOutput
-from shared.constants.constants import VIDEO_HEIGHT, VIDEO_WIDTH
+from shared.constants.constants import ARK_API_URL_DEFAULT, ARK_MODEL_DEFAULT, VIDEO_HEIGHT, VIDEO_WIDTH
 from shared.utils.helpers import ensure_dirs
-
-_CF_URL = (
-    "https://api.cloudflare.com/client/v4/accounts/{account_id}"
-    "/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
-)
-
-
-def _round64(n: int) -> int:
-    """Snap n down to the nearest multiple of 64 (SDXL latent-space requirement)."""
-    return max(64, (n // 64) * 64)
 
 
 class ImageGenTool(BaseTool):
     name = "image_gen"
-    description = "Generate images using Stable Diffusion XL via Cloudflare Workers AI"
+    description = "Generate images using Seedream via ARK API (ByteDance)"
 
     def execute(self, inputs: Dict[str, Any]) -> ToolOutput:
         prompt: str = inputs["prompt"]
         output_path: str = inputs["output_path"]
-        width: int = _round64(inputs.get("width", VIDEO_WIDTH))
-        height: int = _round64(inputs.get("height", VIDEO_HEIGHT))
+        width: int = inputs.get("width", VIDEO_WIDTH)
+        height: int = inputs.get("height", VIDEO_HEIGHT)
+        reference_images: Optional[List[str]] = inputs.get("reference_images")
 
         ensure_dirs(os.path.dirname(output_path) or ".")
 
-        token = os.getenv("CF_API_TOKEN")
-        account_id = os.getenv("CF_ACCOUNT_ID")
-        url = _CF_URL.format(account_id=account_id)
+        api_key = os.getenv("ARK_API_KEY")
+        api_url = os.getenv("ARK_API_URL", ARK_API_URL_DEFAULT)
+        model = os.getenv("ARK_MODEL", ARK_MODEL_DEFAULT)
 
         headers = {
-            "Authorization": f"Bearer {token}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        negative_prompt = (
-            "ugly, blurry, low quality, bad anatomy, extra limbs, deformed, "
-            "watermark, text, logo, out of frame, duplicate, extra characters, "
-            "poorly drawn, disfigured, mutated, oversaturated, noisy"
-        )
-        payload = {
+
+        payload: Dict[str, Any] = {
+            "model": model,
             "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "num_steps": 20,
-            "guidance": 7.5,
-            "width": width,
-            "height": height,
+            "n": 1,
+            "size": f"{width}x{height}",
+            "response_format": "b64_json",
         }
+
+        # Encode reference portraits as IP embeddings (subject_reference)
+        if reference_images:
+            encoded_refs = []
+            for ref_path in reference_images:
+                try:
+                    with open(ref_path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode()
+                    encoded_refs.append({"type": "image", "url": f"data:image/png;base64,{b64}"})
+                except OSError:
+                    pass
+            if encoded_refs:
+                payload["subject_reference"] = encoded_refs
 
         for attempt in range(3):
             try:
-                resp = requests.post(url, headers=headers, json=payload, timeout=120)
+                resp = requests.post(api_url, headers=headers, json=payload, timeout=120)
                 if resp.status_code == 200:
+                    data = resp.json()
+                    b64_image = data["data"][0]["b64_json"]
+                    image_bytes = base64.b64decode(b64_image)
                     with open(output_path, "wb") as f:
-                        f.write(resp.content)
+                        f.write(image_bytes)
                     return ToolOutput(success=True, data={"path": output_path})
                 if resp.status_code in (503, 429):
                     time.sleep(20 * (attempt + 1))
+                    continue
+                # If subject_reference caused a 400, retry without it
+                if resp.status_code == 400 and "subject_reference" in payload:
+                    payload.pop("subject_reference")
                     continue
                 resp.raise_for_status()
             except requests.exceptions.Timeout:
@@ -74,5 +81,5 @@ class ImageGenTool(BaseTool):
 
         return ToolOutput(
             success=False,
-            error="Cloudflare Workers AI returned error after 3 retries",
+            error="ARK Seedream API returned error after 3 retries",
         )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from typing import Optional
 
 from shared.schemas.pipeline_schema import PipelineState
@@ -19,6 +20,15 @@ class SnapshotManager:
         phase: str = "",
         note: str = "",
     ) -> str:
+        # Preserve this version's video as its own file so history entries
+        # are not lost when subsequent edits overwrite final_output.mp4.
+        if pipeline_state.final_video_path and os.path.exists(pipeline_state.final_video_path):
+            video_dir = os.path.dirname(pipeline_state.final_video_path)
+            versioned = os.path.join(video_dir, f"final_output_v{pipeline_state.version}.mp4")
+            if os.path.abspath(pipeline_state.final_video_path) != os.path.abspath(versioned):
+                shutil.copy2(pipeline_state.final_video_path, versioned)
+                pipeline_state.final_video_path = versioned
+
         job_dir = os.path.join(self.state_dir, pipeline_state.job_id)
         os.makedirs(job_dir, exist_ok=True)
 

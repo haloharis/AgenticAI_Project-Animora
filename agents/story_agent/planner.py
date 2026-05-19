@@ -4,21 +4,35 @@ import uuid
 from typing import Any, Dict, List, Tuple
 
 
+_STYLE_TONE: dict = {
+    "cinematic":  "Write a dramatic, emotionally gripping story with high stakes and compelling character arcs. Use vivid, tense dialogue and cinematic pacing.",
+    "fantasy":    "Write an epic adventure set in a magical world with mythical creatures, spells, and heroic quests. Dialogue should feel grand and otherworldly.",
+    "horror":     "Write a suspenseful, chilling story with a creeping sense of dread. Use ominous dialogue, dark settings, and build tension toward a terrifying climax.",
+    "comedy":     "Write a light-hearted, funny story full of humour, witty banter, and comedic misunderstandings. Dialogue should make the audience laugh.",
+    "sci-fi":     "Write a futuristic story involving advanced technology, space exploration, or artificial intelligence. Dialogue should feel intelligent and forward-thinking.",
+    "romance":    "Write a tender love story about two characters falling for each other. Dialogue should be warm, emotionally charged, and romantic.",
+}
+_STYLE_TONE_DEFAULT = "Write a compelling story with engaging characters and a clear narrative arc."
+
+
 def build_story_generation_prompt(user_prompt: str, style: str) -> Tuple[str, str]:
+    tone_instruction = _STYLE_TONE.get(style.lower(), _STYLE_TONE_DEFAULT)
     system_prompt = (
         "You are a creative screenwriter and storyteller. "
         "Your job is to create a compelling short animated video script. "
         "Return a JSON object with the exact structure specified. "
         "Ensure all character_id references in dialogue match character ids exactly. "
-        "Character descriptions are used directly as image generation prompts — write them "
-        "as precise, repeatable visual descriptions: hair color, eye color, clothing, "
-        "distinguishing features. Be specific and concrete, not abstract or narrative. "
-        "Use the same description wording consistently — it will be reused in every scene "
-        "the character appears in to keep their appearance consistent across images."
+        "Character descriptions are used to generate a dedicated portrait image for each character — "
+        "write them as precise visual descriptions: hair color, eye color, skin tone, clothing style, "
+        "height/build, and any distinguishing features. Be specific and concrete, not abstract. "
+        "Scene descriptions must be rich cinematic shot directions: describe the environment, "
+        "lighting, camera angle, character positions, and any action. Do not repeat character "
+        "appearance details in scene descriptions — focus purely on the spatial and visual composition."
     )
     user_msg = f"""Create a short animated video script based on this idea: "{user_prompt}"
 
 Style: {style}
+Tone & genre directive: {tone_instruction}
 
 Return a JSON object with this exact structure:
 {{
@@ -90,39 +104,70 @@ def validate_story_arc(story_dict: Dict[str, Any]) -> Tuple[bool, str]:
     return True, "OK"
 
 
-_COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+_REALISTIC_STYLES = {"realistic", "cinematic", "live action", "documentary", "photorealistic", "real"}
+_ANIME_STYLES = {"anime", "manga", "japanese animation"}
+_ANIMATED_STYLES = {"animated", "cartoon", "2d animation", "pixar", "disney", "3d animation"}
 
 
-def build_visual_prompt(scene: Dict[str, Any], characters: List[Dict[str, Any]]) -> str:
+def _quality_suffix(style: str) -> str:
+    s = style.lower()
+    if any(k in s for k in _REALISTIC_STYLES):
+        return (
+            "photorealistic, hyperrealistic, 8k uhd, sharp focus, "
+            "DSLR photography, natural lighting, film grain, real people, "
+            "not cartoon, not animated, not illustrated"
+        )
+    if any(k in s for k in _ANIME_STYLES):
+        return (
+            "anime style, highly detailed, vibrant colors, "
+            "clean line art, professional anime illustration"
+        )
+    if any(k in s for k in _ANIMATED_STYLES):
+        return (
+            "3D rendered, vibrant colors, smooth shading, "
+            "professional CGI animation, studio quality"
+        )
+    # Default: stylised digital art
+    return (
+        "cinematic composition, volumetric lighting, rich colors, "
+        "ultra detailed, professional digital illustration"
+    )
+
+
+def build_visual_prompt(
+    scene: Dict[str, Any], characters: List[Dict[str, Any]], style: str = ""
+) -> str:
     desc = scene.get("description", "")
     mood = scene.get("mood", "calm")
 
-    # Only include characters who speak in this scene to avoid visual noise
+    # Name + role only — no full descriptions (consistency via IP reference portraits).
+    # Including the role prevents the model from mapping a name to a pop-culture character
+    # (e.g. "Tom" → Tom & Jerry mouse) when subject_reference is absent.
     scene_char_ids = {d["character_id"] for d in scene.get("dialogue", [])}
     scene_chars = [c for c in characters if c["id"] in scene_char_ids]
+    char_tags = ", ".join(
+        f"{c['name']} ({c.get('role', 'human character')})" for c in scene_chars
+    ) if scene_chars else ""
 
-    char_parts = [
-        f"{c['name']} ({c['description']})" for c in scene_chars if c.get("description")
-    ]
-    char_str = "; ".join(char_parts)
-
-    # Derive exact character count from the story data — never rely on the user's phrasing
-    n = len(scene_chars)
-    if n > 0:
-        count_word = _COUNT_WORDS.get(n, str(n))
-        noun = "character" if n == 1 else "characters"
-        count_prefix = f"Scene with exactly {count_word} {noun}: "
-    else:
-        count_prefix = ""
+    quality = _quality_suffix(style)
 
     prompt = (
-        count_prefix
-        + desc
-        + (f", characters: {char_str}" if char_str else "")
-        + f", {mood} atmosphere, cinematic lighting, high quality digital art,"
-          " detailed background, vivid colors, professional illustration"
+        desc
+        + (f", featuring {char_tags}" if char_tags else "")
+        + f", {mood} atmosphere, {quality}"
     )
-    return prompt[:500]
+    return prompt[:600]
+
+
+def build_character_portrait_prompt(character: Dict[str, Any], style: str = "") -> str:
+    desc = character.get("description", "")
+    name = character.get("name", "character")
+    quality = _quality_suffix(style)
+    return (
+        f"Full body character portrait of {name}, {desc}, "
+        f"neutral studio background, character reference sheet, "
+        f"centered composition, clear details, {quality}"
+    )[:600]
 
 
 def estimate_duration(scenes: List[Dict[str, Any]]) -> int:

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any, Dict, List, Union
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from shared.utils.helpers import get_output_dir
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -52,7 +54,14 @@ async def submit_edit(req: EditRequestBody) -> Dict[str, Any]:
 async def get_history(job_id: str) -> List[Dict[str, Any]]:
     from backend.app import get_state_manager
     sm = get_state_manager()
-    return await sm.history(job_id)
+    records = await sm.history(job_id)
+    output_dir = get_output_dir()
+    for rec in records:
+        vpath = os.path.join(output_dir, job_id, f"final_output_v{rec['version']}.mp4")
+        has_video = os.path.exists(vpath)
+        rec["has_video"] = has_video
+        rec["video_url"] = f"/api/pipeline/{job_id}/video?version={rec['version']}" if has_video else None
+    return records
 
 
 @router.post("/{job_id}/revert/{version}")

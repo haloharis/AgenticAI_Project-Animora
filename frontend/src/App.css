@@ -1100,6 +1100,21 @@ input, textarea {
   border-color: var(--accent);
   background: rgba(94,234,212,0.1);
 }
+.tl-play {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #4ade80;
+  border: 1px solid rgba(74,222,128,0.35);
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.tl-play:hover {
+  background: rgba(74,222,128,0.12);
+  border-color: #4ade80;
+}
 .tl-current-tag {
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;

@@ -48,6 +48,7 @@ export async function rerunPhase(jobId, phase) {
   return res.json()
 }
 
-export function getVideoUrl(jobId) {
-  return `${BASE}/pipeline/${jobId}/video`
+export function getVideoUrl(jobId, version = null) {
+  const url = `${BASE}/pipeline/${jobId}/video`
+  return version !== null ? `${url}?version=${version}` : url
 }
