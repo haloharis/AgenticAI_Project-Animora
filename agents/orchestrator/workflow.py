@@ -42,7 +42,7 @@ class PipelineWorkflow:
         return progress_fn
 
     async def run_pipeline(
-        self, job_id: str, user_prompt: str, style: str = "cinematic"
+        self, job_id: str, user_prompt: str, style: str = "cinematic", add_subtitles: bool = False
     ) -> PipelineState:
         from mcp.tool_registry import ToolRegistry
         ToolRegistry.auto_register_all()
@@ -109,7 +109,7 @@ class PipelineWorkflow:
             log_fn = self._make_log_fn(job_id, "video", loop)
             progress_fn = self._make_progress_fn(job_id, "video", loop)
             video_path = await loop.run_in_executor(
-                None, lambda: VideoAgent().run(ps.story, ps.timing_manifest, job_id, log_fn=log_fn, progress_fn=progress_fn)
+                None, lambda: VideoAgent().run(ps.story, ps.timing_manifest, job_id, add_subtitles=add_subtitles, log_fn=log_fn, progress_fn=progress_fn)
             )
             ps.final_video_path = video_path
             ps = update_phase_status(ps, "video", PhaseStatus.completed, progress_pct=100)
@@ -125,7 +125,7 @@ class PipelineWorkflow:
         await self._emit(job_id, {"type": "done", "success": ps.final_video_path is not None})
         return ps
 
-    async def rerun_phase(self, job_id: str, phase: str) -> PipelineState:
+    async def rerun_phase(self, job_id: str, phase: str, add_subtitles: bool = False) -> PipelineState:
         ps = await self.state_manager.get_latest(job_id)
         if not ps:
             raise ValueError(f"No pipeline state found for job {job_id}")
@@ -159,7 +159,7 @@ class PipelineWorkflow:
             elif phase == "video":
                 from agents.video_agent.agent import VideoAgent
                 video_path = await loop.run_in_executor(
-                    None, lambda: VideoAgent().run(ps.story, ps.timing_manifest, job_id, log_fn=log_fn, progress_fn=progress_fn)
+                    None, lambda: VideoAgent().run(ps.story, ps.timing_manifest, job_id, add_subtitles=add_subtitles, log_fn=log_fn, progress_fn=progress_fn)
                 )
                 ps.final_video_path = video_path
                 ps = update_phase_status(ps, phase, PhaseStatus.completed, progress_pct=100)

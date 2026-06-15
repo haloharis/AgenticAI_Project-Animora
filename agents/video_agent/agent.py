@@ -142,7 +142,6 @@ class VideoAgent:
         if not comp_result.success:
             raise RuntimeError(f"Video composition failed: {comp_result.error}")
 
-        # Step 4: Optional subtitles
         if add_subtitles:
             sub_path = output_path.replace(".mp4", "_subtitled.mp4")
             sub_result = self.executor.run(
