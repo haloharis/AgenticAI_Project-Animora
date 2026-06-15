@@ -17,20 +17,26 @@ Return a JSON object with these fields:
 - intent: one of "audio", "video_frame", "video", "script"
 - target: what to target (e.g. "all", "scene_001", "char_001", "narrator")
 - scope: "single" or "all"
-- parameters: dict of relevant parameters (e.g. {"mood": "sad"}, {"style": "darker"})
+- parameters: dict of relevant parameters (rules per intent below)
 - confidence: float between 0.0 and 1.0
 
-Intent categories:
+Intent categories and required parameters:
 - audio: changes to voice tone, BGM, volume, music style
-- video_frame: changes to scene visuals, character appearance, color palette
+  parameters must include "mood" (e.g. "sad", "epic", "calm")
+- video_frame: changes to scene visuals, character appearance, lighting, time-of-day, color palette
+  parameters MUST include "style" — a short visual description of the desired change
+  (e.g. {"style": "night time, dark sky, moonlit"} or {"style": "warm golden hour lighting"})
 - video: changes to the full video composition, speed, subtitles, transitions
+  parameters may include "subtitles": true/false
 - script: changes to dialogue, story, character lines, narrative
+  parameters may include "instruction" with a short description of the change
 
-Examples:
-"Make it sadder" -> audio intent with mood parameter
-"Change scene 2 to night time" -> video_frame intent targeting that scene
-"Add subtitles" -> video intent with subtitles parameter
-"Rewrite the ending" -> script intent"""
+Examples (return only valid JSON):
+"Make it sadder" -> {"intent":"audio","target":"all","scope":"all","parameters":{"mood":"sad"},"confidence":0.95}
+"Change scene 2 to night time" -> {"intent":"video_frame","target":"scene_2","scope":"single","parameters":{"style":"night time, dark sky, moonlit"},"confidence":0.97}
+"Make all scenes darker" -> {"intent":"video_frame","target":"all","scope":"all","parameters":{"style":"dark, moody, low-key lighting"},"confidence":0.95}
+"Add subtitles" -> {"intent":"video","target":"all","scope":"all","parameters":{"subtitles":true},"confidence":0.98}
+"Rewrite the ending" -> {"intent":"script","target":"all","scope":"all","parameters":{"instruction":"rewrite the ending"},"confidence":0.9}"""
 
 
 class IntentClassifier:
@@ -64,6 +70,7 @@ Classify this edit request."""
                 scope="all",
                 parameters={},
                 confidence=0.5,
+                query=query,
             )
 
         try:
@@ -76,6 +83,7 @@ Classify this edit request."""
                 scope=data.get("scope", "all"),
                 parameters=data.get("parameters", {}),
                 confidence=float(data.get("confidence", 0.8)),
+                query=query,
             )
         except Exception as e:
             logger.warning(f"Intent classification parse error: {e}. Defaulting to video.")
@@ -85,6 +93,7 @@ Classify this edit request."""
                 scope="all",
                 parameters={},
                 confidence=0.5,
+                query=query,
             )
 
     def _build_context(self, ps: PipelineState) -> str:

@@ -16,6 +16,8 @@ class Mood(str, Enum):
     mysterious = "mysterious"
     epic = "epic"
     romantic = "romantic"
+    horror = "horror"
+    cartoon = "cartoon"
 
 
 class PhaseStatus(str, Enum):
@@ -41,9 +43,11 @@ class TransitionType(str, Enum):
 class Character(BaseModel):
     id: str = Field(default_factory=lambda: f"char_{uuid.uuid4().hex[:8]}")
     name: str
+    role: str = "supporting"
     description: str
     voice_id: str = "aura-asteria-en"
     personality: str = ""
+    reference_image_path: str = ""
 
 
 class DialogueLine(BaseModel):
@@ -131,6 +135,7 @@ class EditAction(BaseModel):
     scope: str = "single"
     parameters: Dict[str, Any] = Field(default_factory=dict)
     confidence: float = 1.0
+    query: str = ""  # original user query — fallback when LLM parameters are incomplete
 
 
 class EditResult(BaseModel):

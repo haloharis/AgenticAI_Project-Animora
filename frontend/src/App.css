@@ -1100,6 +1100,21 @@ input, textarea {
   border-color: var(--accent);
   background: rgba(94,234,212,0.1);
 }
+.tl-play {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #4ade80;
+  border: 1px solid rgba(74,222,128,0.35);
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.tl-play:hover {
+  background: rgba(74,222,128,0.12);
+  border-color: #4ade80;
+}
 .tl-current-tag {
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
@@ -1169,115 +1184,89 @@ input, textarea {
 }
 
 /* ----------------------------------------------------------------
-   Full-screen generation overlay
+   Live log console
    ---------------------------------------------------------------- */
 
-.gen-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: rgba(15,15,26,0.85);
-  backdrop-filter: blur(14px);
-  display: grid;
-  place-items: center;
+.live-logs {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0a0e17;
+  overflow: hidden;
   animation: reply-in 0.3s ease both;
 }
-.gen-overlay-inner {
-  text-align: center;
-  max-width: 420px;
-  padding: 24px;
-}
-.gen-logo {
-  width: 88px; height: 88px;
-  margin: 0 auto 24px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #5eead4, #7dd3fc);
-  display: grid;
-  place-items: center;
-  position: relative;
-  box-shadow: 0 0 60px -10px rgba(94,234,212,0.7);
-}
-.gen-logo::before, .gen-logo::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 24px;
-  border: 1px solid transparent;
-  background: conic-gradient(from var(--angle, 0deg), transparent, #5eead4, #7dd3fc, transparent) border-box;
-  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  animation: spin-border 3s linear infinite;
-}
-.gen-logo::after {
-  inset: -10px;
-  border-radius: 28px;
-  opacity: 0.4;
-  animation-duration: 5s;
-  animation-direction: reverse;
-}
-.gen-logo-glyph {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 38px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: -0.05em;
-}
-.gen-overlay h2 {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0 0 8px;
-  background: linear-gradient(135deg, #fff, #c4b5fd);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.gen-overlay p.sub {
-  color: var(--muted);
-  font-size: 14px;
-  margin: 0 0 28px;
-  min-height: 22px;
-  transition: opacity 0.4s;
-}
-
-.mini-phases {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 20px;
-}
-.mini-phase {
+.live-logs-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 12px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
   color: var(--muted);
-  background: rgba(255,255,255,0.02);
-  transition: all 0.3s;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-.mini-phase.active {
-  color: var(--text);
-  border-color: var(--accent);
-  background: rgba(94,234,212,0.12);
-}
-.mini-phase.done {
-  color: var(--success);
-  border-color: rgba(110,231,183,0.35);
-  background: rgba(110,231,183,0.08);
-}
-.mini-phase .pip {
+.live-logs-dot {
   width: 6px; height: 6px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+  box-shadow: 0 0 6px var(--accent);
 }
-.mini-phase.active .pip {
-  animation: pulse-dot 1.2s ease-in-out infinite;
-  box-shadow: 0 0 8px currentColor;
+.live-logs-body {
+  height: 168px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  line-height: 1.75;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.live-logs-body::-webkit-scrollbar { width: 4px; }
+.live-logs-body::-webkit-scrollbar-track { background: transparent; }
+.live-logs-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.live-logs-empty {
+  color: var(--muted);
+  opacity: 0.45;
+  font-style: italic;
+}
+.log-line {
+  display: flex;
+  gap: 8px;
+  color: rgba(232, 236, 243, 0.55);
+  animation: reply-in 0.15s ease both;
+}
+.log-line.warning { color: #fbbf24; }
+.log-line.error   { color: #f87171; }
+.log-phase-tag {
+  flex-shrink: 0;
+  opacity: 0.45;
+  min-width: 44px;
+}
+.log-msg {
+  word-break: break-word;
+}
+
+/* Running-phase live status line inside phase card */
+.phase-log-live {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: reply-in 0.25s ease both;
+}
+.phase-log-live .glyph {
+  color: var(--accent);
+  flex-shrink: 0;
 }
 
 /* Footer */

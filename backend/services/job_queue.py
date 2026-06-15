@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-Job = Tuple[str, str, str]  # (job_id, prompt, style)
+Job = Tuple[str, str, str, bool]  # (job_id, prompt, style, add_subtitles)
 
 
 class JobQueue:
@@ -24,9 +24,9 @@ class JobQueue:
             cls._instance = JobQueue()
         return cls._instance
 
-    async def enqueue(self, job_id: str, prompt: str, style: str) -> None:
+    async def enqueue(self, job_id: str, prompt: str, style: str, add_subtitles: bool = False) -> None:
         self._status[job_id] = "queued"
-        await self._queue.put((job_id, prompt, style))
+        await self._queue.put((job_id, prompt, style, add_subtitles))
         logger.info(f"Job {job_id} enqueued")
 
     def get_status(self, job_id: str) -> str:
@@ -45,12 +45,12 @@ class JobQueue:
     async def _worker(self, workflow_factory) -> None:
         while True:
             try:
-                job_id, prompt, style = await self._queue.get()
+                job_id, prompt, style, add_subtitles = await self._queue.get()
                 self._status[job_id] = "running"
                 logger.info(f"Processing job {job_id}")
                 try:
                     workflow = workflow_factory()
-                    ps = await workflow.run_pipeline(job_id, prompt, style)
+                    ps = await workflow.run_pipeline(job_id, prompt, style, add_subtitles=add_subtitles)
                     self.set_state(job_id, ps)
                     self._status[job_id] = "completed"
                     logger.info(f"Job {job_id} completed")

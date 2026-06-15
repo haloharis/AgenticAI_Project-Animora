@@ -14,7 +14,7 @@ Output: 30-second animated MP4 with narrated scenes, ambient music, character di
 
 - **Story generation** — LLaMA 3.3 70B builds a structured multi-scene narrative with characters and dialogue
 - **AI voice synthesis** — Deepgram Aura TTS gives each character a distinct voice
-- **Scene images** — FLUX.1-schnell generates cinematic visuals per scene
+- **Scene images** — Seedream (ByteDance ARK API) generates cinematic visuals per scene
 - **Ken Burns animation** — Subtle zoom/pan gives static images motion
 - **Ambient BGM** — Mood-matched background music synthesized from sine waves
 - **Real-time progress** — SSE stream shows each pipeline phase as it runs
@@ -25,7 +25,7 @@ Output: 30-second animated MP4 with narrated scenes, ambient music, character di
 
 - Python 3.11+
 - Node.js 18+
-- API keys for: [Groq](https://console.groq.com), [Hugging Face](https://huggingface.co/settings/tokens), [Deepgram](https://console.deepgram.com)
+- API keys for: [Groq](https://console.groq.com), [ByteDance ARK](https://www.volcengine.com/product/ark), [Deepgram](https://console.deepgram.com)
 
 ## Quick Start
 
@@ -53,7 +53,8 @@ Edit `.env` and fill in:
 
 ```
 GROQ_API_KEY=your_groq_key_here
-HF_API_TOKEN=your_huggingface_token_here
+ARK_API_KEY=your_ark_api_key_here
+ARK_MODEL=seedream-4-0-250828
 DEEPGRAM_API_KEY=your_deepgram_key_here
 ```
 
@@ -139,7 +140,7 @@ pytest tests/unit/ agents/ --cov=. --cov-report=term-missing
 | Layer | Technology |
 |-------|-----------|
 | LLM | Groq — LLaMA 3.3 70B Versatile |
-| Image generation | Hugging Face — FLUX.1-schnell |
+| Image generation | ByteDance ARK — Seedream (`seedream-4-0-250828`) |
 | Text-to-speech | Deepgram — Aura |
 | Video composition | MoviePy + FFmpeg |
 | Agent orchestration | LangGraph |
@@ -150,7 +151,7 @@ pytest tests/unit/ agents/ --cov=. --cov-report=term-missing
 
 ## Troubleshooting
 
-**Image generation returns 503** — This is normal during model cold start (first request of the day). The system retries automatically up to 3 times. Wait ~60 seconds.
+**Image generation returns 503 or 429** — The ARK/Seedream API may be overloaded or rate-limiting. `ImageGenTool` retries automatically up to 3 times with back-off. If it persists, wait ~60 seconds and resubmit.
 
 **No audio in video** — Ensure FFmpeg is installed. The `imageio-ffmpeg` package bundles a binary; if MoviePy still can't find it, install FFmpeg system-wide.
 

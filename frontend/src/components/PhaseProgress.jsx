@@ -1,61 +1,8 @@
-import { useState, useEffect } from 'react'
-
 const PHASE_DEFS = [
   { id: 'story', name: 'Story & Script',    emoji: '📖', hint: '~12s' },
   { id: 'audio', name: 'Audio & Voices',    emoji: '🎙️', hint: '~24s' },
   { id: 'video', name: 'Video Composition', emoji: '🎬', hint: '~38s' },
 ]
-
-const LOG_MESSAGES = {
-  story: [
-    'Drafting story structure…',
-    'Generating character arcs…',
-    'Writing scene 1: opening shot…',
-    'Writing scene 2: rising action…',
-    'Polishing dialogue…',
-    'Finalizing script beats…',
-  ],
-  audio: [
-    'Casting character voices…',
-    'Converting dialogue to speech…',
-    'Generating ambient soundscape…',
-    'Composing background score…',
-    'Mixing voice and music tracks…',
-    'Mastering audio output…',
-  ],
-  video: [
-    'Generating keyframes…',
-    'Rendering scene 1 visuals…',
-    'Compositing scene transitions…',
-    'Synchronising audio to video…',
-    'Applying colour grading…',
-    'Encoding final MP4…',
-  ],
-}
-
-function PhaseLog({ phaseId }) {
-  const [idx, setIdx] = useState(0)
-  const messages = LOG_MESSAGES[phaseId] || []
-
-  useEffect(() => {
-    const i = setInterval(() => setIdx(n => (n + 1) % messages.length), 1800)
-    return () => clearInterval(i)
-  }, [phaseId, messages.length])
-
-  const current = messages[idx]
-  const prev    = messages[(idx - 1 + messages.length) % messages.length]
-
-  return (
-    <div className="phase-log">
-      <div className="phase-log-line" key={`p-${idx}`} style={{ animationDelay: '-1.5s' }}>
-        <span className="glyph">›</span>{prev}
-      </div>
-      <div className="phase-log-line fresh" key={`c-${idx}`}>
-        <span className="glyph">›</span>{current}
-      </div>
-    </div>
-  )
-}
 
 function StatusBadge({ status }) {
   if (!status || status === 'pending') {
@@ -73,7 +20,7 @@ function StatusBadge({ status }) {
   return null
 }
 
-export default function PhaseProgress({ phases, onRerun }) {
+export default function PhaseProgress({ phases, onRerun, logs = [] }) {
   return (
     <div className="card">
       <div className="card-header">
@@ -125,7 +72,18 @@ export default function PhaseProgress({ phases, onRerun }) {
                 />
               </div>
 
-              {ph.status === 'running' && <PhaseLog phaseId={p.id} />}
+              {ph.status === 'running' && (() => {
+                const latest = [...logs].reverse().find(l => l.phase === p.id)
+                return latest ? (
+                  <div className="phase-log-live" key={latest.ts}>
+                    <span className="glyph">›</span>{latest.message}
+                  </div>
+                ) : (
+                  <div className="phase-log-live">
+                    <span className="glyph">›</span>Processing…
+                  </div>
+                )
+              })()}
             </div>
           )
         })}

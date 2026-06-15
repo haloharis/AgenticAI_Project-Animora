@@ -50,6 +50,7 @@ export default function EditAgent({
   currentVersion,
   onApplyEdit,
   onRevert,
+  onPlayVersion,
   loadingHistory,
 }) {
   const [query,       setQuery]       = useState('')
@@ -237,6 +238,14 @@ export default function EditAgent({
                   <span className="tl-phase" style={{ color: phaseColor }}>{v.phase}</span>
                   <span className="tl-note">{v.note}</span>
                   <span className="tl-time">{timeAgo(v.created_at)}</span>
+                  {v.has_video && (
+                    <button
+                      type="button"
+                      className="tl-play"
+                      onClick={() => onPlayVersion && onPlayVersion(v.video_url)}
+                      title="Play this version"
+                    >▶</button>
+                  )}
                   {isCurrent ? (
                     <span className="tl-current-tag">current</span>
                   ) : (

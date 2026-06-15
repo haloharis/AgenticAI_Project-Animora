@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+import os
 from typing import Any, Dict, List, Union
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from shared.utils.helpers import get_output_dir
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class EditRequestBody(BaseModel):
@@ -29,7 +34,15 @@ async def submit_edit(req: EditRequestBody) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"Job {req.job_id} not found")
 
     agent = EditAgent(state_manager=sm)
-    result = agent.run(req.query, ps)
+    try:
+        # Run in a thread so _execute_edit_node can safely create its own
+        # event loop via asyncio.new_event_loop().run_until_complete().
+        # Calling that from within the already-running uvicorn loop raises
+        # "Cannot run the event loop while another loop is running".
+        result = await asyncio.to_thread(agent.run, req.query, ps)
+    except Exception as e:
+        logger.exception("Edit agent raised an unhandled exception")
+        raise HTTPException(status_code=500, detail=f"Edit agent failed: {e}")
 
     if isinstance(result, str):
         return {"job_id": req.job_id, "clarification": result, "success": False}
@@ -41,7 +54,14 @@ async def submit_edit(req: EditRequestBody) -> Dict[str, Any]:
 async def get_history(job_id: str) -> List[Dict[str, Any]]:
     from backend.app import get_state_manager
     sm = get_state_manager()
-    return await sm.history(job_id)
+    records = await sm.history(job_id)
+    output_dir = get_output_dir()
+    for rec in records:
+        vpath = os.path.join(output_dir, job_id, f"final_output_v{rec['version']}.mp4")
+        has_video = os.path.exists(vpath)
+        rec["has_video"] = has_video
+        rec["video_url"] = f"/api/pipeline/{job_id}/video?version={rec['version']}" if has_video else None
+    return records
 
 
 @router.post("/{job_id}/revert/{version}")

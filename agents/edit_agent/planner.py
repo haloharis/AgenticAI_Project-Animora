@@ -1,10 +1,24 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Dict, List
 
-from shared.schemas.pipeline_schema import EditAction, EditIntent, PipelineState
+from shared.schemas.pipeline_schema import EditAction, EditIntent, PipelineState, Scene
 from shared.utils.helpers import get_output_dir, get_temp_dir
+
+
+def _scene_matches_target(scene: Scene, target: str) -> bool:
+    """Match a scene against a target string like 'all', 'scene_3', '3', or a UUID id."""
+    if scene.id == target:
+        return True
+    if str(scene.scene_number) == target:
+        return True
+    # Handle "scene_3", "scene3", "scene_003" — extract the numeric part and compare
+    m = re.search(r"\d+", target)
+    if m and str(scene.scene_number) == str(int(m.group())):
+        return True
+    return False
 
 
 class EditPlanner:
@@ -25,7 +39,7 @@ class EditPlanner:
 
             scenes = story.scenes if story else []
             if target_scene and story:
-                scenes = [s for s in story.scenes if s.id == target_scene or str(s.scene_number) == target_scene]
+                scenes = [s for s in story.scenes if _scene_matches_target(s, target_scene)]
 
             for scene in scenes:
                 bgm_path = os.path.join(audio_dir, f"{scene.id}_bgm.wav")
@@ -55,12 +69,19 @@ class EditPlanner:
                 calls.append(self._compositor_call(story, audio_dir, images_dir, final_video))
 
         elif action.intent == EditIntent.video_frame:
-            style_modifier = action.parameters.get("style", action.parameters.get("description", ""))
+            # Try well-known keys first, then fall back to any string value in parameters,
+            # then fall back to the raw user query so the edit is never silently dropped.
+            style_modifier = (
+                action.parameters.get("style")
+                or action.parameters.get("description")
+                or next((str(v) for v in action.parameters.values() if v), None)
+                or action.query
+            )
             target_scene = action.target if action.target != "all" else None
 
             scenes = story.scenes if story else []
             if target_scene and story:
-                scenes = [s for s in story.scenes if s.id == target_scene or str(s.scene_number) == target_scene]
+                scenes = [s for s in story.scenes if _scene_matches_target(s, target_scene)]
 
             for scene in scenes:
                 img_path = os.path.join(images_dir, f"{scene.id}.png")
@@ -89,15 +110,21 @@ class EditPlanner:
                             "output_path": sub_path,
                         },
                     })
+                    # Tell executor to update pipeline_state.final_video_path to the subtitled file.
+                    calls.append({
+                        "tool": "__update_final_video__",
+                        "inputs": {"new_path": sub_path},
+                    })
 
         elif action.intent == EditIntent.script:
-            # Re-run story generation (simplified: just flag for orchestrator)
+            # Signal the executor to re-run story → audio → video with the edit instruction.
             calls.append({
-                "tool": "logger_tool",
+                "tool": "__story_rerun__",
                 "inputs": {
-                    "level": "info",
-                    "message": "Script edit requested — full pipeline re-run required",
-                    "extra": {"action": action.model_dump()},
+                    "edit_instruction": action.query,
+                    "original_prompt": pipeline_state.user_prompt,
+                    "style": pipeline_state.style,
+                    "job_id": job_id,
                 },
             })
 

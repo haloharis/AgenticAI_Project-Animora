@@ -42,7 +42,7 @@ export default function VideoPreview({ videoUrl, jobId }) {
 
       <div className="video-frame">
         {videoUrl ? (
-          <video src={videoUrl} controls />
+          <video key={videoUrl} src={videoUrl} controls />
         ) : (
           <div className="video-empty">
             <div className="video-empty-inner">
